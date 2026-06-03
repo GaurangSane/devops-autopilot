@@ -1,0 +1,10 @@
+2024-01-15 02:13:45 ERROR [payment-service] Connection pool exhausted: max_connections=10 reached
+2024-01-15 02:13:45 ERROR [payment-service] Failed to acquire connection after 30000ms timeout
+2024-01-15 02:13:46 ERROR [payment-service] Transaction rollback triggered for order_id=ORD-8821
+2024-01-15 02:13:46 WARN  [api-gateway] Upstream payment-service returning 503
+2024-01-15 02:13:47 ERROR [api-gateway] Circuit breaker OPEN for payment-service after 5 failures
+2024-01-15 02:13:47 ERROR [order-service] Payment verification timeout for order_id=ORD-8821
+2024-01-15 02:13:48 ERROR [order-service] Order failed, initiating compensation workflow
+2024-01-15 02:13:50 FATAL [payment-service] Database connection lost: postgresql://payments-db:5432
+2024-01-15 02:13:50 ERROR [payment-service] Health check failed - service marked as unhealthy
+2024-01-15 02:13:55 WARN  [load-balancer] Removing payment-service instance from pool
