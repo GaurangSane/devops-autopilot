@@ -1,8 +1,8 @@
 from langchain_core.messages import HumanMessage,SystemMessage
 from langchain_community.tools.tavily_search import TavilySearchResults
-from base import get_LLM
-from log_analyzer import analyze_logs
-from root_cause import log_root_analyze
+from agents.base import get_LLM
+from agents.log_analyzer_1 import analyze_logs
+from agents.root_cause_2 import log_root_analyze
 from dotenv import load_dotenv
 import os
 
@@ -63,7 +63,7 @@ def search_web(queries:list[str]) -> str:
             print(f"Search failed for {query}\n : {e}\n")
             continue
 
-        return "...\n\n".join(all_search)     
+    return "...\n\n".join(all_search)     
 
 def poposes_fixes(root_cause: str) -> dict:
     model = get_LLM(temperature=0.2)

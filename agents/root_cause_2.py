@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage , SystemMessage
-from base import get_LLM
-from log_analyzer import analyze_logs
+from .base import get_LLM
+from agents.log_analyzer_1 import analyze_logs
 
 SYSTEM_PROMPT = """
 You are a senior Site Reliability Engineer specializing in distributed systems 

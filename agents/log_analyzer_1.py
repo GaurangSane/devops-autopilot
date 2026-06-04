@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage, SystemMessage
-from base import get_LLM
+from .base import get_LLM
 
 SYSTEM_PROMPT = """
 You are an expert DevOps engineer and SRE (Site Reliability Engineer) 
