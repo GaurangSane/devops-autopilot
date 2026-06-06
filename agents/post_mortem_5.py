@@ -6,6 +6,14 @@ from agents.fix_proposer_3 import poposes_fixes
 from agents.runbook_writer_4 import write_runbook
 from datetime import datetime
 import os
+from utils.logger import get_logger
+from utils.retry import llm_retry
+
+@llm_retry
+def _invoke_model(llm,messsages):
+    return llm.invoke(messsages)
+
+log = get_logger("post_mortem")
 
 SYSTEM_PROMPT ="""
 You are a principal engineer and incident commander with experience writing 
@@ -39,37 +47,43 @@ Format your response with these EXACT headers:
 """
 
 def write_post_mortem(log_analysis:str,root_cause:str,fixes:str,runbook:str) -> str:
-    model = get_LLM(temperature=0.2)
-    combined_context = f"""
-    LOG ANALYSIS:
-    {log_analysis}
+    log.info("started post mortem")
+    try:
+        model = get_LLM(temperature=0.2)
+        combined_context = f"""
+        LOG ANALYSIS:
+        {log_analysis}
 
-    ROOT CAUSE ANALYSIS:
-    {root_cause}
+        ROOT CAUSE ANALYSIS:
+        {root_cause}
 
-    PROPOSED FIXES:
-    {fixes}
+        PROPOSED FIXES:
+        {fixes}
 
-    RUNBOOK CREATED:
-    {runbook}
-    Incident date : {datetime.now().strftime("%Y-%m-%d")}
-"""
-    messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=f"""
-    Write a complete blameless post-mortem report for this incident.
-    The executive summary must be readable by a non-technical CEO.
-    Action items must be specific with owner roles and deadlines.
-    Timeline must be chronological with exact timestamps from the logs.
-    Action items table MUST have minimum 5 rows.
-    Timeline MUST use exact timestamps from the logs.
-    Executive summary MUST be understandable by a non-technical reader.
-    {combined_context}
-    """)
-        ]
+        RUNBOOK CREATED:
+        {runbook}
+        Incident date : {datetime.now().strftime("%Y-%m-%d")}
+        """
+        messages = [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=f"""
+        Write a complete blameless post-mortem report for this incident.
+        The executive summary must be readable by a non-technical CEO.
+        Action items must be specific with owner roles and deadlines.
+        Timeline must be chronological with exact timestamps from the logs.
+        Action items table MUST have minimum 5 rows.
+        Timeline MUST use exact timestamps from the logs.
+        Executive summary MUST be understandable by a non-technical reader.
+        {combined_context}
+        """)
+            ]
 
-    response = model.invoke(messages)
-    return response.content
+        response = _invoke_model(model,messsages=messages)
+        log.info('completed Post portem')
+        return response.content
+    except Exception as e:
+        log.info(f"post mortem failed")
+        raise
 
 def save_post_mortem(post_mortem:str,filename:str=None)->str:
     os.makedirs("post_mortems",exist_ok=True)

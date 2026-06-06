@@ -5,6 +5,14 @@ from agents.log_analyzer_1 import analyze_logs
 from agents.root_cause_2 import log_root_analyze
 from dotenv import load_dotenv
 import os
+from utils.logger import get_logger
+from utils.retry import llm_retry
+
+@llm_retry
+def _invoke_model(llm,messsages):
+    return llm.invoke(messsages)
+
+log = get_logger("proposer_fixer")
 
 load_dotenv()
 
@@ -37,20 +45,26 @@ Format your response with these exact headers:
 """
 
 def get_search_queries(root_cause : str) -> list[str]:
-    model = get_LLM(temperature=0.2)
-    message = [
-        SystemMessage(content="""
-        You are a DevOps expert. 
-        Given a root cause analysis, generate exactly 3 specific search queries
-        to find solutions. Return ONLY the 3 queries, one per line, nothing else.
-        Make queries specific and technical — include technology names, error types.
-        """),
-        HumanMessage(content=f"Generate 3 search queries for this RCA:\n\n{root_cause}")
-    ]
+    log.info("starting proposer fixes")
+    try:
+        model = get_LLM(temperature=0.2)
+        message = [
+            SystemMessage(content="""
+            You are a DevOps expert. 
+            Given a root cause analysis, generate exactly 3 specific search queries
+            to find solutions. Return ONLY the 3 queries, one per line, nothing else.
+            Make queries specific and technical — include technology names, error types.
+            """),
+            HumanMessage(content=f"Generate 3 search queries for this RCA:\n\n{root_cause}")
+        ]
 
-    response = model.invoke(message)
-    queries = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
-    return queries[:3]
+        response = _invoke_model(model,messsages=message)
+        log.info("poposer fixer completed succesfully")
+        queries = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
+        return queries[:3]
+    except Exception as e:
+        log.error("proposer fixes failed: {e}")
+        raise
 
 def search_web(queries:list[str]) -> str:
     all_search = []

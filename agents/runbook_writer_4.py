@@ -4,6 +4,14 @@ from datetime import datetime
 from agents.log_analyzer_1 import analyze_logs
 from agents.root_cause_2 import log_root_analyze
 from agents.fix_proposer_3 import poposes_fixes
+from utils.logger import get_logger
+from utils.retry import llm_retry
+
+@llm_retry
+def _invoke_model(llm,messsages):
+    return llm.invoke(messsages)
+
+log = get_logger("runbook_writer")
 
 SYSTEM_PROMPT = """
 You are a senior SRE technical writer with 10+ years of experience writing 
@@ -36,30 +44,34 @@ Format your response with these EXACT headers:
 """
 
 def write_runbook(log_analysis:str,root_cause:str,fixes:str) ->str:
-    model = get_LLM(temperature=0.2)
-    combined_context = f"""
-        INCIDENT LOG ANALYSIS:
-    {log_analysis}
+    log.info("Started runbook writer")
+    try:
+        model = get_LLM(temperature=0.2)
+        combined_context = f"""
+            INCIDENT LOG ANALYSIS:
+        {log_analysis}
 
-    ROOT CAUSE ANALYSIS:
-    {root_cause}
+        ROOT CAUSE ANALYSIS:
+        {root_cause}
 
-    PROPOSED FIXES:
-    {fixes}
-    todays date = {datetime.now().strftime("%Y-%m-%d")}
-    """
-    messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=f"""
-    Write a complete production runbook based on this incident analysis.
-    Make it detailed enough that a junior engineer can follow it alone at 2am.
-    {combined_context}
-    """)
-    ]
+        PROPOSED FIXES:
+        {fixes}
+        todays date = {datetime.now().strftime("%Y-%m-%d")}
+        """
+        messages = [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=f"""
+        Write a complete production runbook based on this incident analysis.
+        Make it detailed enough that a junior engineer can follow it alone at 2am.
+        {combined_context}
+        """)
+        ]
 
-    response = model.invoke(messages)
-    return response.content
-
+        response = _invoke_model(model,messsages=messages)
+        log.info("run book completed.")
+        return response.content
+    except Exception as e:
+        log.error(f"runbook writer failed")
 def save_runbook(runbook:str,filename:str=None) -> str:
     import os
     os.makedirs("runbook",exist_ok=True)
