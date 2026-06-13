@@ -1,7 +1,13 @@
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
 import streamlit as st
 import requests
 import time
 from datetime import datetime
+from utils.tracing import get_project_stats
 
 # ─────────────────────────────────────────
 # Config
@@ -429,6 +435,30 @@ elif page == "📊 Dashboard":
                     count
                 )
 
+    # Add this inside the Dashboard page section
+    st.divider()
+    st.markdown("### 🔬 LangSmith Observability")
+
+    stats = get_project_stats()
+
+    if stats:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Agent Runs", stats["total_runs"])
+        with col2:
+            st.metric("Avg Pipeline Latency", f"{stats['avg_latency']}s")
+        with col3:
+            st.metric("Error Rate", f"{stats['error_rate']}%")
+        with col4:
+            st.metric("Failed Runs", stats.get("errors",0))
+
+        st.caption("📊 Full traces → [LangSmith Dashboard](https://smith.langchain.com)")
+    else:
+        st.info("LangSmith not configured or no runs yet.")             
+
     st.divider()
     st.markdown("### API Health")
     st.json(health)
+
+
+

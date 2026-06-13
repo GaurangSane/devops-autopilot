@@ -1,3 +1,12 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Must be set before langgraph/langchain imports
+os.environ["LANGCHAIN_TRACING_V2"] = os.getenv("LANGCHAIN_TRACING_V2", "true")
+os.environ["LANGCHAIN_API_KEY"]    = os.getenv("LANGCHAIN_API_KEY", "")
+os.environ["LANGCHAIN_PROJECT"]    = os.getenv("LANGCHAIN_PROJECT", "devops-autopilot")
+
 from langgraph.graph import StateGraph, END
 from graph.state import AgentState
 from graph.nodes import (
@@ -7,6 +16,9 @@ from graph.nodes import (
     runbook_writer_node,
     post_mortem_node
 )
+from utils.logger import get_logger
+
+log = get_logger("workflow")
 
 
 def should_continue_after_log_analysis(state: AgentState) -> str:
@@ -84,6 +96,44 @@ def build_graph():
     print("✅ Graph compiled successfully")
 
     return compiled
+
+def run_graph(raw_logs: str, incident_id: str) -> dict:
+    """
+    Wrapper around graph.invoke() with LangSmith metadata.
+    Every call to this function appears as one trace
+    in LangSmith with incident_id tagged for easy lookup.
+    """
+    graph = build_graph()
+
+    initial_state = {
+        "raw_logs":         raw_logs,
+        "log_analysis":     None,
+        "root_cause":       None,
+        "fixes":            None,
+        "search_queries":   None,
+        "runbook":          None,
+        "post_mortem":      None,
+        "severity":         None,
+        "affected_services":None,
+        "incident_id":      incident_id,
+        "runbook_path":     None,
+        "post_mortem_path": None,
+        "errors":           [],
+        "current_agent":    None
+    }
+
+    # LangSmith picks this up automatically via env vars
+    # Tags let you filter runs in the dashboard
+    config = {
+        "tags":     ["production", "devops-autopilot"],
+        "metadata": {"incident_id": incident_id}
+    }
+
+    log.info(f"Starting graph run for incident {incident_id}")
+    final_state = graph.invoke(initial_state, config=config)
+    log.info(f"Graph run completed for incident {incident_id}")
+
+    return final_state
 
 
 if __name__ == "__main__":

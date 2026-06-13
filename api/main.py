@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,6 +10,7 @@ from database.models import Incident, get_session, init_db
 from sqlalchemy.orm import Session
 
 from graph.workflow import build_graph
+from graph.workflow import run_graph
 
 
 # ─────────────────────────────────────────
@@ -21,8 +24,12 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup():
-    init_db()
-    print("✅ Database initialized")
+    try:
+        init_db()
+        print("✅ Database initialized")
+    except Exception as e:
+        print(f"❌ Database startup failed: {e}")
+        raise
 
 # Allow Streamlit to talk to FastAPI
 app.add_middleware(
@@ -110,7 +117,7 @@ def run_pipeline(incident_id: str, raw_logs: str):
             "current_agent": None
         }
 
-        final_state = graph.invoke(initial_state)
+        final_state = run_graph(raw_logs,initial_state)
 
         # Persist results
         incident.status           = "completed"
@@ -199,7 +206,7 @@ async def analyze_logs(
 
     # Create incident record
     incident_id = f"INC-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
-    created_at = datetime.now().isoformat()
+    
 
     db = get_session()
 
