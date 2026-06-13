@@ -52,6 +52,8 @@ class AnalyzeRequest(BaseModel):
     """What the client sends us"""
     raw_logs: str
     submitted_by: Optional[str] = "anonymous"
+    repo_url:     Optional[str] = ""       # NEW
+    user_context: Optional[str] = "" 
 
 
 class IncidentSummary(BaseModel):
@@ -84,7 +86,7 @@ class IncidentDetail(BaseModel):
 # ─────────────────────────────────────────
 # Background Task — runs pipeline async
 # ─────────────────────────────────────────
-def run_pipeline(incident_id: str, raw_logs: str):
+def run_pipeline(incident_id: str, raw_logs: str,repo_url: str = "", user_context: str = ""):
     """Updated to persist to PostgreSQL"""
     db: Session = get_session()
 
@@ -117,22 +119,26 @@ def run_pipeline(incident_id: str, raw_logs: str):
             "current_agent": None
         }
 
-        final_state = run_graph(raw_logs,initial_state)
+        final_state = run_graph(
+            raw_logs=raw_logs,
+            incident_id=incident_id,
+            repo_url=repo_url,
+            user_context=user_context
+        )
 
-        # Persist results
-        incident.status           = "completed"
-        incident.log_analysis     = final_state.get("log_analysis")
-        incident.root_cause       = final_state.get("root_cause")
-        incident.fixes            = final_state.get("fixes")
-        incident.runbook          = final_state.get("runbook")
-        incident.post_mortem      = final_state.get("post_mortem")
-        incident.severity         = final_state.get("severity")
+        incident.status          = "completed"
+        incident.log_analysis    = final_state.get("log_analysis")
+        incident.root_cause      = final_state.get("root_cause")
+        incident.fixes           = final_state.get("fixes")
+        incident.runbook         = final_state.get("runbook")
+        incident.post_mortem     = final_state.get("post_mortem")
+        incident.severity        = final_state.get("severity")
         incident.affected_services = final_state.get("affected_services")
-        incident.search_queries   = final_state.get("search_queries")
-        incident.runbook_path     = final_state.get("runbook_path")
+        incident.search_queries  = final_state.get("search_queries")
+        incident.runbook_path    = final_state.get("runbook_path")
         incident.post_mortem_path = final_state.get("post_mortem_path")
-        incident.errors           = final_state.get("errors", [])
-        incident.updated_at       = datetime.utcnow()
+        incident.errors          = final_state.get("errors", [])
+        incident.updated_at      = datetime.utcnow()
         db.commit()
 
     except Exception as e:
@@ -225,7 +231,9 @@ async def analyze_logs(
         background_tasks.add_task(
             run_pipeline,
             incident_id,
-            request.raw_logs
+            request.raw_logs,
+            request.repo_url,     # NEW
+            request.user_context
         )
 
         return IncidentSummary(

@@ -7,6 +7,9 @@ from graph.state import AgentState
 from datetime import datetime
 import uuid
 import re
+from utils.logger import get_logger
+
+log = get_logger("nodes")
 
 def generate_incident_id() -> str:
     """Generates a unique incident ID like INC-20260605-A3F2"""
@@ -186,3 +189,47 @@ def post_mortem_node(state: AgentState) -> dict:
             "errors": state.get("errors", []) + [f"post_mortem failed: {str(e)}"],
             "current_agent": "post_mortem_writer"
         }
+    
+from agents.github_agent import analyze_with_github
+
+def github_agent_node(state: AgentState) -> dict:
+    """
+    Optional node — only runs if user provided a repo URL.
+    Fetches source code and gives line-specific fixes.
+    """
+    repo_url = state.get("repo_url", "").strip()
+
+    # Skip if no repo provided
+    if not repo_url:
+        log.info("[Node: GitHub] No repo URL provided — skipping")
+        return {
+            "github_analysis": None,
+            "github_used": False,
+            "current_agent": "github_agent"
+        }
+
+    log.info(f"[Node: GitHub] Analyzing repo: {repo_url}")
+
+    try:
+        result = analyze_with_github(
+            root_cause=state.get("root_cause", ""),
+            affected_services=state.get("affected_services", []),
+            repo_url=repo_url,
+            user_context=state.get("user_context", "")
+        )
+
+        return {
+            "github_analysis":  result["code_analysis"],
+            "relevant_files":   result["repo_data"]["relevant_files"],
+            "github_used":      result["github_used"],
+            "current_agent":    "github_agent"
+        }
+
+    except Exception as e:
+        log.error(f"GitHub agent failed: {e}")
+        return {
+            "github_analysis": f"GitHub analysis failed: {str(e)}",
+            "github_used":     False,
+            "errors": state.get("errors", []) + [f"github_agent: {str(e)}"],
+            "current_agent":   "github_agent"
+        }    
